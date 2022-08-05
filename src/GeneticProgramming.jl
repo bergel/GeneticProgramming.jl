@@ -1,10 +1,10 @@
 module GeneticProgramming
 
-using Infiltrator
+#using Infiltrator
 
 export GPNode
 export number_of_children, gp_type, gp_value, gp_children
-export gp_eval, gp_print
+export gp_eval, gp_print, gp_copy
 
 struct GPNode
     type::Symbol
@@ -16,8 +16,8 @@ struct GPNode
             type::Symbol=:UNDEFINED,
             value::Any=nothing,
             children::Vector{GPNode}=GPNode[],
-            printing::Function=gp_default_printing)
-        return new(type, value, children, printing)
+            print::Function=gp_default_print)
+        return new(type, value, children, print)
     end
 end
 
@@ -27,8 +27,7 @@ gp_children(n::GPNode) = n.children
 number_of_children(n::GPNode) = length(gp_children(n))
 
 # Return a collection of strings
-function gp_default_printing(n::GPNode, res::Vector{String})
-    #@infiltrate
+function gp_default_print(n::GPNode, res::Vector{String})
     if(!(gp_value(n) isa Function))
         push!(res, string(gp_value(n)))
         return
@@ -65,5 +64,13 @@ end
 function gp_print(n::GPNode, res::Vector{String})
     n.print(n, res)
 end
+
+function gp_copy(n::GPNode)
+    copied_children = GPNode[gp_copy(a_node) for a_node in gp_children(n)]
+    return GPNode(gp_type(n), gp_value(n), copied_children, n.print)
+end
+
+# GENETIC PROGRAMMING
+
 
 end # module
