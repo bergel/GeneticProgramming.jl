@@ -2,3 +2,6 @@ name = "GeneticProgramming"
 uuid = "69c39023-fbd0-4fb2-8f7d-4f1508d0feb9"
 authors = ["Alexandre Bergel <alexandre.bergel@relational.ai>"]
 version = "0.1.0"
+
+[deps]
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"

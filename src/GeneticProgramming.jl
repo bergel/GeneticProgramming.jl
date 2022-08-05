@@ -1,10 +1,15 @@
 module GeneticProgramming
 
-#using Infiltrator
+using Infiltrator
+using Random
 
 export GPNode
 export number_of_children, gp_type, gp_value, gp_children
 export gp_eval, gp_print, gp_copy
+export gp_number
+
+export GPConfig
+export build_individual, number_of_terminal_rules, number_of_non_terminal_rules
 
 struct GPNode
     type::Symbol
@@ -72,5 +77,54 @@ end
 
 # GENETIC PROGRAMMING
 
+struct GPConfig
+    root::Symbol
+    rules::Vector{Pair{Symbol, Any}}
+    non_terminal_rules::Vector{Pair{Symbol, Any}}
+    terminal_rules::Vector{Pair{Symbol, Any}}
 
+    function GPConfig(seed::Int64, root::Symbol, rules::Vector{Pair{Symbol, Any}})
+        Random.seed!(seed)
+        non_terminal_rules::Vector{Pair{Symbol, Any}} = filter(r -> !(last(r) isa Function), rules)
+        #@infiltrate
+        terminal_rules::Vector{Pair{Symbol, Any}} = filter(r -> (last(r) isa Function), rules)
+        return new(root, rules, non_terminal_rules, terminal_rules)
+    end
+end
+
+number_of_terminal_rules(config::GPConfig) = length(config.terminal_rules)
+number_of_non_terminal_rules(config::GPConfig) = length(config.non_terminal_rules)
+
+
+function gp_number()
+    return GPNode(:number, rand(-10:10))
+end
+
+function candidate_rules(gp::GPConfig, id::Symbol)
+    return filter(a_rule -> first(a_rule) == id, gp.rules)
+end
+
+function build_individual(gp::GPConfig)
+
+end
+
+
+is_terminal(gp::GPConfig, rule::Pair{Symbol, Any})=rule in gp.terminal_rules
+is_non_terminal(gp::GPConfig, rule::Pair{Symbol, Any})=rule in gp.non_terminal_rules
+
+function build_individual(gp::GPConfig, id::Symbol)
+    #@infiltrate
+    selected_rule = rand(candidate_rules(gp, id))
+    #@infiltrate
+    if(is_terminal(gp, selected_rule))
+        return last(selected_rule)()
+    else
+        return "hello"
+    end
+
+end
+
+function build_individual(gp::GPConfig, result::GPNode)
+
+end
 end # module
