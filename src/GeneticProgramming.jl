@@ -1,6 +1,6 @@
 module GeneticProgramming
 
-using Infiltrator
+#using Infiltrator
 using Random
 
 export GPNode
@@ -9,6 +9,7 @@ export gp_eval, gp_print, gp_copy
 export gp_number
 
 export GPConfig
+export Atom, gp_print_infix
 export build_individual, number_of_terminal_rules, number_of_non_terminal_rules
 
 struct GPNode
@@ -79,16 +80,36 @@ end
 
 struct GPConfig
     root::Symbol
-    rules::Vector{Pair{Symbol, Any}}
+    rules::Vector{Pair{Symbol, Vector{Any}}}
     non_terminal_rules::Vector{Pair{Symbol, Any}}
     terminal_rules::Vector{Pair{Symbol, Any}}
+    minimum_depth::Int64
+    maximum_depth::Int64
+    minimum_width::Int64
+    maximum_width::Int64
 
-    function GPConfig(seed::Int64, root::Symbol, rules::Vector{Pair{Symbol, Any}})
+    function GPConfig(
+            seed::Int64,
+            root::Symbol,
+            rules::Vector{Pair{Symbol,Vector{Any}}};
+            minimum_depth=1,
+            maximum_depth=10,
+            minimum_width=1,
+            maximum_width=20
+        )
         Random.seed!(seed)
-        non_terminal_rules::Vector{Pair{Symbol, Any}} = filter(r -> !(last(r) isa Function), rules)
+        non_terminal_rules::Vector{Pair{Symbol, Any}} = [] #filter(r -> !(last(r) isa Function), rules)
         #@infiltrate
-        terminal_rules::Vector{Pair{Symbol, Any}} = filter(r -> (last(r) isa Function), rules)
-        return new(root, rules, non_terminal_rules, terminal_rules)
+        terminal_rules::Vector{Pair{Symbol, Any}} = [] #filter(r -> (last(r) isa Function), rules)
+        return new(
+            root,
+            rules,
+            non_terminal_rules,
+            terminal_rules,
+            minimum_depth,
+            maximum_depth,
+            minimum_width,
+            maximum_width)
     end
 end
 
@@ -96,8 +117,9 @@ number_of_terminal_rules(config::GPConfig) = length(config.terminal_rules)
 number_of_non_terminal_rules(config::GPConfig) = length(config.non_terminal_rules)
 
 
+#NOT NECESSARY
 function gp_number()
-    return GPNode(:number, rand(-10:10))
+    return rand(-10:10)
 end
 
 function candidate_rules(gp::GPConfig, id::Symbol)
@@ -110,21 +132,68 @@ end
 
 
 is_terminal(gp::GPConfig, rule::Pair{Symbol, Any})=rule in gp.terminal_rules
+is_terminal(gp::GPConfig, id::Symbol)=!isempty(filter(r->first(r) == id, gp.terminal_rules))
+
 is_non_terminal(gp::GPConfig, rule::Pair{Symbol, Any})=rule in gp.non_terminal_rules
 
 function build_individual(gp::GPConfig, id::Symbol)
-    #@infiltrate
-    selected_rule = rand(candidate_rules(gp, id))
-    #@infiltrate
-    if(is_terminal(gp, selected_rule))
-        return last(selected_rule)()
+    return build_individual(gp, id, 1, 1)
+end
+
+function build_individual(gp::GPConfig, id::Symbol, depth::Int64, width::Int64)
+    candidate_r = candidate_rules(gp, id)
+    @assert !isempty(candidate_r) "No candidate rule found for \"$id\""
+
+    if(depth <= gp.minimum_depth || width <= gp.minimum_width)
+        size_of_candidate_rules = map(r->length(last(r)), candidate_r)
+        smallest_rule_size = min(size_of_candidate_rules...)
+        candidate_r_for_minimum = filter(r->length(last(r)) > smallest_rule_size, candidate_r)
+        if(isempty(candidate_r_for_minimum))
+            candidate_r_for_minimum = candidate_r
+        end
+        selected_rule = rand(candidate_r_for_minimum)
+    elseif(depth >= gp.maximum_depth || width >= gp.maximum_width)
+        size_of_candidate_rules = map(r->length(last(r)), candidate_r)
+        smallest_rule_size = min(size_of_candidate_rules...)
+        candidate_r_for_maximum = filter(r->length(last(r)) == smallest_rule_size, candidate_r)
+        selected_rule = rand(candidate_r_for_maximum)
     else
-        return "hello"
+        selected_rule = rand(candidate_r)
     end
 
+    terminal_atoms = filter(elem -> elem isa Atom, last(selected_rule))
+    if isempty(terminal_atoms)
+        # We simply do a recursion
+        @assert length(last(selected_rule)) == 1
+        return build_individual(gp, last(selected_rule)[1], depth+1, width)
+    else
+        @assert length(terminal_atoms) == 1
+        terminal_atom = first(terminal_atoms)
+        non_atoms = filter(elem -> !(elem isa Atom), last(selected_rule))
+        children::Vector{GPNode} = [build_individual(gp, an_id, depth+1, width+length(non_atoms)) for an_id in non_atoms]
+        return GPNode(terminal_atom.id, terminal_atom.value(), children, terminal_atom.print)
+    end
 end
 
-function build_individual(gp::GPConfig, result::GPNode)
+# Atom in the grammar (contained in the rules)
+struct Atom
+    id::Symbol
+    value::Any
+    print::Function
 
+    function Atom(id::Symbol, value::Any=nothing, print::Function=gp_default_print)
+        return new(id, value, print)
+    end
 end
+
+
+
+function gp_print_infix(n::GPNode, res::Vector{String})
+    gp_print(gp_children(n)[1], res)
+    push!(res, " ")
+    push!(res, string(gp_type(n)))
+    push!(res, " ")
+    gp_print(gp_children(n)[2], res)
+end
+
 end # module
