@@ -1,11 +1,11 @@
 module GeneticProgramming
 
-#using Infiltrator
+using Infiltrator
 using Random
 
 export GPNode
 export number_of_children, gp_type, gp_value, gp_children
-export gp_eval, gp_print, gp_copy
+export gp_eval, gp_print, gp_copy, gg_type
 export gp_number
 
 export GPConfig
@@ -87,9 +87,9 @@ struct GPConfig
     maximum_width::Int64
 
     function GPConfig(
-            seed::Int64,
-            root::Symbol,
             rules::Vector{Pair{Symbol,Vector{Any}}};
+            root::Symbol=first(first(rules)),
+            seed::Int64=42,
             minimum_depth=1,
             maximum_depth=10,
             minimum_width=1,
@@ -148,6 +148,7 @@ function build_individual(gp::GPConfig, id::Symbol, depth::Int64, width::Int64)
         @assert length(terminal_atoms) == 1
         terminal_atom = first(terminal_atoms)
         non_atoms = filter(elem -> !(elem isa Atom), last(selected_rule))
+        @infiltrate !isempty(filter(x -> !(x isa Symbol), non_atoms))
         children::Vector{GPNode} = [build_individual(gp, an_id, depth+1, width+length(non_atoms)) for an_id in non_atoms]
         return GPNode(terminal_atom.id, terminal_atom.value(), children, terminal_atom.print)
     end
