@@ -81,8 +81,6 @@ end
 struct GPConfig
     root::Symbol
     rules::Vector{Pair{Symbol, Vector{Any}}}
-    non_terminal_rules::Vector{Pair{Symbol, Any}}
-    terminal_rules::Vector{Pair{Symbol, Any}}
     minimum_depth::Int64
     maximum_depth::Int64
     minimum_width::Int64
@@ -98,28 +96,14 @@ struct GPConfig
             maximum_width=20
         )
         Random.seed!(seed)
-        non_terminal_rules::Vector{Pair{Symbol, Any}} = [] #filter(r -> !(last(r) isa Function), rules)
-        #@infiltrate
-        terminal_rules::Vector{Pair{Symbol, Any}} = [] #filter(r -> (last(r) isa Function), rules)
         return new(
             root,
             rules,
-            non_terminal_rules,
-            terminal_rules,
             minimum_depth,
             maximum_depth,
             minimum_width,
             maximum_width)
     end
-end
-
-number_of_terminal_rules(config::GPConfig) = length(config.terminal_rules)
-number_of_non_terminal_rules(config::GPConfig) = length(config.non_terminal_rules)
-
-
-#NOT NECESSARY
-function gp_number()
-    return rand(-10:10)
 end
 
 function candidate_rules(gp::GPConfig, id::Symbol)
@@ -129,12 +113,6 @@ end
 function build_individual(gp::GPConfig)
 
 end
-
-
-is_terminal(gp::GPConfig, rule::Pair{Symbol, Any})=rule in gp.terminal_rules
-is_terminal(gp::GPConfig, id::Symbol)=!isempty(filter(r->first(r) == id, gp.terminal_rules))
-
-is_non_terminal(gp::GPConfig, rule::Pair{Symbol, Any})=rule in gp.non_terminal_rules
 
 function build_individual(gp::GPConfig, id::Symbol)
     return build_individual(gp, id, 1, 1)
@@ -185,8 +163,6 @@ struct Atom
         return new(id, value, print)
     end
 end
-
-
 
 function gp_print_infix(n::GPNode, res::Vector{String})
     gp_print(gp_children(n)[1], res)
