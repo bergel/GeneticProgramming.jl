@@ -35,4 +35,7 @@ end
     ind_mutated = mutate(gp, ind)
     @test gp_print(ind_mutated) == "(((3 + (0 + -5)) + -7) + 4)"
     @test gp_print(ind) == "((4 + -7) + 4)"
+
+    @test gp_print(mutate(gp, ind)) == "(((0 + 2) + (-1 + -4)) + 4)"
+    @test gp_print(mutate(gp, ind)) == "((4 + ((-3 + -9) + 0)) + 4)"
 end
