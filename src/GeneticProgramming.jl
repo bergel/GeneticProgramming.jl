@@ -9,21 +9,24 @@ export gp_eval, gp_print, gp_copy, gg_type
 export gp_number
 
 export GPConfig
-export Atom, gp_print_infix
-export build_individual, number_of_terminal_rules, number_of_non_terminal_rules
+export Atom, gp_print_infix, gp_print_infix_parent
+export build_individual, mutate
 
 struct GPNode
     type::Symbol
     value::Any
     children::Vector{GPNode}
     print::Function
+    producing_rule::Pair{Symbol, Vector{Any}}
 
     function GPNode(
             type::Symbol=:UNDEFINED,
             value::Any=nothing,
             children::Vector{GPNode}=GPNode[],
-            print::Function=gp_default_print)
-        return new(type, value, children, print)
+            print::Function=gp_default_print,
+            producing_rule::Pair{Symbol, Vector{Any}}=:UNDEFINED=>[]
+        )
+        return new(type, value, children, print, producing_rule)
     end
 end
 
@@ -34,12 +37,13 @@ number_of_children(n::GPNode) = length(gp_children(n))
 
 # Return a collection of strings
 function gp_default_print(n::GPNode, res::Vector{String})
-    if(!(gp_value(n) isa Function))
+    if(isnothing(gp_value(n)))
+        push!(res, string(gp_type(n)))
+    else
         push!(res, string(gp_value(n)))
-        return
     end
 
-    push!(res, string(gp_type(n)))
+    (number_of_children(n) == 0) && return
     push!(res, "( ")
     for tuple in enumerate(gp_children(n))
         gp_print(tuple[2], res)
@@ -73,7 +77,7 @@ end
 
 function gp_copy(n::GPNode)
     copied_children = GPNode[gp_copy(a_node) for a_node in gp_children(n)]
-    return GPNode(gp_type(n), gp_value(n), copied_children, n.print)
+    return GPNode(gp_type(n), gp_value(n), copied_children, n.print, n.producing_rule)
 end
 
 # GENETIC PROGRAMMING
@@ -111,7 +115,7 @@ function candidate_rules(gp::GPConfig, id::Symbol)
 end
 
 function build_individual(gp::GPConfig)
-
+    return build_individual(gp, first(first(gp.rules)))
 end
 
 function build_individual(gp::GPConfig, id::Symbol)
@@ -150,18 +154,18 @@ function build_individual(gp::GPConfig, id::Symbol, depth::Int64, width::Int64)
         non_atoms = filter(elem -> !(elem isa Atom), last(selected_rule))
         @infiltrate !isempty(filter(x -> !(x isa Symbol), non_atoms))
         children::Vector{GPNode} = [build_individual(gp, an_id, depth+1, width+length(non_atoms)) for an_id in non_atoms]
-        return GPNode(terminal_atom.id, terminal_atom.value(), children, terminal_atom.print)
+        return GPNode(terminal_atom.id, terminal_atom.value_factory(), children, terminal_atom.print, selected_rule)
     end
 end
 
 # Atom in the grammar (contained in the rules)
 struct Atom
     id::Symbol
-    value::Any
+    value_factory::Function
     print::Function
 
-    function Atom(id::Symbol, value::Any=nothing, print::Function=gp_default_print)
-        return new(id, value, print)
+    function Atom(id::Symbol, value_factory::Any=()->nothing, print::Function=gp_default_print)
+        return new(id, value_factory, print)
     end
 end
 
@@ -171,6 +175,47 @@ function gp_print_infix(n::GPNode, res::Vector{String})
     push!(res, string(gp_type(n)))
     push!(res, " ")
     gp_print(gp_children(n)[2], res)
+end
+
+function gp_print_infix_parent(n::GPNode, res::Vector{String})
+    push!(res, "(")
+    gp_print(gp_children(n)[1], res)
+    push!(res, " ")
+    push!(res, string(gp_type(n)))
+    push!(res, " ")
+    gp_print(gp_children(n)[2], res)
+    push!(res, ")")
+end
+
+
+# Genetic operation
+function enumerate_nodes(n::GPNode)
+    res = GPNode[]
+    enumerate_nodes(n, res)
+    return res
+end
+
+function enumerate_nodes(n::GPNode, res::Vector{GPNode})
+    push!(res, n)
+    foreach(nn->enumerate_nodes(nn, res), gp_children(n))
+end
+
+function mutate(gp::GPConfig, n::GPNode)
+    n_copy = gp_copy(n)
+    all_subnodes = enumerate_nodes(n_copy)[2:end]
+    selected_remplacement_node = rand(all_subnodes)
+    new_ind = build_individual(gp, first(selected_remplacement_node.producing_rule))
+    replace_node(n_copy, selected_remplacement_node, new_ind)
+    return n_copy
+end
+
+function replace_node(root::GPNode, from::GPNode, to::GPNode)
+    if from in gp_children(root)
+        children = gp_children(root)
+        children[first(findall(x->x==from, gp_children(root)))] = to
+        return
+    end
+    foreach(nn->replace_node(nn, from, to), gp_children(root))
 end
 
 end # module

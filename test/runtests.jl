@@ -8,5 +8,6 @@ end
 
 
 @testset "GP" begin
-    include("GP_testing.jl")
+    include("GP_structure_testing.jl")
+    include("GP_operation_testing.jl")
 end

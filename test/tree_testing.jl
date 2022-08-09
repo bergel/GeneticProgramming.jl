@@ -29,7 +29,7 @@ end
     n_mult = GPNode(:Mult, *, [n_add, GPNode(:Number, 10)])
     @test gp_eval(n_mult) == 420
 
-    @test gp_print(n_mult) == "Mult( Addition( 40, 2 ), 10 )"
+    @test gp_print(n_mult) == "*( +( 40, 2 ), 10 )"
 end
 
 @testset "Hybrid printing" begin
@@ -56,7 +56,7 @@ end
     n_mult = GPNode(:Mult, *, [n_add, GPNode(:Number, 10)])
     @test gp_eval(n_mult) == 420
 
-    @test gp_print(n_mult) == "Mult( (40 + 2), 10 )"
+    @test gp_print(n_mult) == "*( (40 + 2), 10 )"
 end
 
 @testset "Printing" begin
