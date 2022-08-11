@@ -9,8 +9,9 @@ export gp_eval, gp_print, gp_copy, gg_type
 export gp_number
 
 export GPConfig
-export Atom, gp_print_infix, gp_print_infix_parent
+export Atom
 export build_individual, mutate
+export generic_infix_print, generic_prefix_print
 
 struct GPNode
     type::Symbol
@@ -37,19 +38,7 @@ number_of_children(n::GPNode) = length(gp_children(n))
 
 # Return a collection of strings
 function gp_default_print(n::GPNode, res::Vector{String})
-    if(isnothing(gp_value(n)))
-        push!(res, string(gp_type(n)))
-    else
-        push!(res, string(gp_value(n)))
-    end
-
-    (number_of_children(n) == 0) && return
-    push!(res, "( ")
-    for tuple in enumerate(gp_children(n))
-        gp_print(tuple[2], res)
-        (tuple[1] < number_of_children(n)) && push!(res, ", ")
-    end
-    push!(res, " )")
+    return generic_prefix_print("( ", ", ", " )")(n, res)
 end
 
 function gp_eval(n::GPNode)
@@ -164,27 +153,37 @@ struct Atom
     value_factory::Function
     print::Function
 
-    function Atom(id::Symbol, value_factory::Any=()->nothing, print::Function=gp_default_print)
+    function Atom(id::Symbol, value_factory::Function=()->nothing, print::Function=gp_default_print)
         return new(id, value_factory, print)
     end
 end
 
-function gp_print_infix(n::GPNode, res::Vector{String})
-    gp_print(gp_children(n)[1], res)
-    push!(res, " ")
-    push!(res, string(gp_type(n)))
-    push!(res, " ")
-    gp_print(gp_children(n)[2], res)
+function generic_infix_print(outer_before::String="", inner_before::String=" ", inner_after::String=" ", outer_after::String="")
+    return (n::GPNode, res::Vector{String}) -> begin
+        push!(res, outer_before)
+        gp_print(gp_children(n)[1], res)
+        push!(res, inner_before)
+        push!(res, string(gp_value(n)))
+        push!(res, inner_after)
+        gp_print(gp_children(n)[2], res)
+        push!(res, outer_after)
+    end
 end
 
-function gp_print_infix_parent(n::GPNode, res::Vector{String})
-    push!(res, "(")
-    gp_print(gp_children(n)[1], res)
-    push!(res, " ")
-    push!(res, string(gp_type(n)))
-    push!(res, " ")
-    gp_print(gp_children(n)[2], res)
-    push!(res, ")")
+function generic_prefix_print(outer_before::String, inner::String, outer_after::String)
+    return (n::GPNode, res::Vector{String}) -> begin
+        push!(res, string(gp_value(n)))
+        number_of_children(n) == 0 && return
+
+        push!(res, outer_before)
+        foreach((index, child)->
+            begin
+                gp_print(child, res)
+                index !== number_of_children(n) && push!(res, inner)
+            end,
+            1:number_of_children(n), gp_children(n))
+        push!(res, outer_after)
+    end
 end
 
 

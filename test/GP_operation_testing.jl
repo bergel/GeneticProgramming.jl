@@ -1,6 +1,6 @@
 @testset "Utility function for mutation" begin
     rules = [
-        :expr => [:expr, Atom(:+, ()->"+", gp_print_infix_parent), :expr]
+        :expr => [:expr, Atom(:+, ()->"+", generic_infix_print("(", " ", " ", ")")), :expr]
         :expr => [Atom(:number, ()->rand(-10:10))]
     ]
 
@@ -24,7 +24,7 @@ end
 
 @testset "Mutation" begin
     rules = [
-        :expr => [:expr, Atom(:+, ()->"+", gp_print_infix_parent), :expr]
+        :expr => [:expr, Atom(:+, ()->"+", generic_infix_print("(", " ", " ", ")")), :expr]
         :expr => [Atom(:number, ()->rand(-10:10))]
     ]
 

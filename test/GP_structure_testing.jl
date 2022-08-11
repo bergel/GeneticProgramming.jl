@@ -162,12 +162,12 @@ end
     end
     rules = [
         :expr => [:term],
-        :expr => [:term, Atom(:+, ()->+, gp_print_infix), :term],
-        :expr => [:term, Atom(:+, ()->-, gp_print_infix), :term],
+        :expr => [:term, Atom(:+, ()->+, generic_infix_print()), :term],
+        :expr => [:term, Atom(:-, ()->-, generic_infix_print()), :term],
 
         :term => [:factor],
-        :term => [:factor, Atom(:*, ()->*, gp_print_infix), :factor],
-        :term => [:factor, Atom(:/, ()->/, gp_print_infix), :factor],
+        :term => [:factor, Atom(:*, ()->*, generic_infix_print()), :factor],
+        :term => [:factor, Atom(:/, ()->/, generic_infix_print()), :factor],
 
         :factor => [Atom(:number, ()->rand(-10:10))],
         :factor => [Atom(:parent, ()->"()", print_parent), :expr]
@@ -176,8 +176,8 @@ end
                     rules
                 )
 
-    @test gp_print(build_individual(gp_config, :expr)) == "4 * (((0) + -6) * 0) + (-4 * 8)"
-    @test gp_print(build_individual(gp_config, :expr)) == "-7 * (3 + (7 * -4) * ((1) / (7) + 3 / -3)) + (-6 * ((-8) / (9) + 6 / (1)) + (-1 * 6 + -5 / (0))) / 6"
-    @test gp_print(build_individual(gp_config, :expr)) == "(((2) / -5 + 1) / 9 + ((7) / 10 + (-2))) + (((-6) * 9 + -10) + -9 / -6)"
-    @test gp_print(build_individual(gp_config, :expr)) == "(((5) / -8 + (-7) / 2) + -10 * -4) * (((4) / (8) + (0) / 5)) + (-8 * ((-10) * 1 + 1 / -6) + (-9 / 7) * -3) / (((-10) / 1) + ((-7) / (2) + (9) * (-10)))"
+    @test gp_print(build_individual(gp_config, :expr)) == "4 * (((0) + -6) * 0) - (-4 * 8)"
+    @test gp_print(build_individual(gp_config, :expr)) == "-7 * (3 + (7 * -4) * ((1) / (7) + 3 / -3)) + (-6 * ((-8) / (9) + 6 / (1)) - (-1 * 6 - -5 / (0))) / 6"
+    @test gp_print(build_individual(gp_config, :expr)) == "(((2) / -5 - 1) / 9 - ((7) / 10 + (-2))) + (((-6) * 9 + -10) - -9 / -6)"
+    @test gp_print(build_individual(gp_config, :expr)) == "(((5) / -8 - (-7) / 2) - -10 * -4) * (((4) / (8) + (0) / 5)) + (-8 * ((-10) * 1 + 1 / -6) + (-9 / 7) * -3) / (((-10) / 1) + ((-7) / (2) - (9) * (-10)))"
 end
