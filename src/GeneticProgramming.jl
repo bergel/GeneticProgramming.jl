@@ -161,11 +161,16 @@ end
 function generic_infix_print(outer_before::String="", inner_before::String=" ", inner_after::String=" ", outer_after::String="")
     return (n::GPNode, res::Vector{String}) -> begin
         push!(res, outer_before)
-        gp_print(gp_children(n)[1], res)
-        push!(res, inner_before)
-        push!(res, string(gp_value(n)))
-        push!(res, inner_after)
-        gp_print(gp_children(n)[2], res)
+        foreach((index, child)->
+            begin
+                gp_print(child, res)
+                if(index !== number_of_children(n))
+                    push!(res, inner_before)
+                    push!(res, string(gp_value(n)))
+                    push!(res, inner_after)
+                end
+            end,
+            1:number_of_children(n), gp_children(n))
         push!(res, outer_after)
     end
 end
