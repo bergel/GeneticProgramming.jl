@@ -1,8 +1,8 @@
 @testset "Basic" begin
     rules = [
         :expr => [:number],
-        :expr => [:number , Atom(:+, (()->+)) , :expr],
-        :number => [Atom(:number, ()->rand(-10:10))]
+        :expr => [:number , Atom(value_factory=(()->+)) , :expr],
+        :number => [Atom(id=:number, value_factory = ()->rand(-10:10))]
     ]
     gp_config = GPConfig(
                     rules
@@ -26,18 +26,10 @@
 end
 
 @testset "With printing" begin
-    function gp_print_add(n::GPNode, res::Vector{String})
-        push!(res, "(")
-        gp_print(gp_children(n)[1], res)
-        push!(res, " + ")
-        gp_print(gp_children(n)[2], res)
-        push!(res, ")")
-    end
-
     rules = [
         :expr => [:number],
-        :expr => [:number , Atom(:+, (()->+), gp_print_add) , :expr],
-        :number => [Atom(:number, ()->rand(-10:10))]
+        :expr => [:number , Atom(; value_factory=(()->+), print=infix_print("(", ")")) , :expr],
+        :number => [Atom(value_factory=()->rand(-10:10))]
     ]
     gp_config = GPConfig(
                     rules
@@ -48,7 +40,6 @@ end
 
     number_node = build_individual(gp_config, :number)
     @test number_node isa GPNode
-    @test gp_type(number_node) == :number
     @test typeof(gp_value(number_node)) == Int64
 
     Random.seed!(42)
@@ -62,15 +53,10 @@ end
 end
 
 @testset "Another example" begin
-    function my_print(n::GPNode, res::Vector{String})
-        gp_print(gp_children(n)[1], res)
-        push!(res, ",")
-        gp_print(gp_children(n)[2], res)
-    end
     rules = [
         :chain => [:char],
-        :chain => [:char, Atom(:seq,  ()->',', my_print), :chain],
-        :char => [Atom(:char, ()->'*')]
+        :chain => [:char, Atom(; value_factory=()->',', print=minimal_infix_print()), :chain],
+        :char => [Atom(; value_factory = ()->'*')]
     ]
     gp_config = GPConfig(
                     rules
@@ -88,15 +74,10 @@ end
 
 
 @testset "Another example with minimum and maximum depth" begin
-    function my_print(n::GPNode, res::Vector{String})
-        gp_print(gp_children(n)[1], res)
-        push!(res, ",")
-        gp_print(gp_children(n)[2], res)
-    end
     rules = [
         :chain => [:char],
-        :chain => [:char, Atom(:seq,  ()->',', my_print), :chain],
-        :char => [Atom(:char, ()->'*')]
+        :chain => [:char, Atom(; value_factory=()->',', print=minimal_infix_print()), :chain],
+        :char => [Atom(; value_factory=()->'*')]
     ]
     gp_config = GPConfig(
                     rules;
@@ -121,8 +102,8 @@ end
     end
     rules = [
         :chain => [:char],
-        :chain => [Atom(:seq,  ()->',', my_print), :chain, :chain, :chain],
-        :char => [Atom(:char, ()->'*')]
+        :chain => [Atom(my_print, :seq,  ()->','), :chain, :chain, :chain],
+        :char => [Atom(gp_default_print, :char, ()->'*')]
     ]
     gp_config = GPConfig(
                     rules;
@@ -141,8 +122,8 @@ end
     end
     rules = [
         :chain => [:char],
-        :chain => [Atom(:seq,  ()->',', my_print), :chain, :chain, :chain],
-        :char => [Atom(:char, ()->'*')]
+        :chain => [Atom(my_print, :seq,  ()->','), :chain, :chain, :chain],
+        :char => [Atom(gp_default_print, :char, ()->'*')]
     ]
     gp_config = GPConfig(
                     rules;
@@ -162,19 +143,17 @@ end
     end
     rules = [
         :expr => [:term],
-        :expr => [:term, Atom(:+, ()->+, generic_infix_print()), :term],
-        :expr => [:term, Atom(:-, ()->-, generic_infix_print()), :term],
+        :expr => [:term, Atom(infix_print(), :+, ()->+), :term],
+        :expr => [:term, Atom(infix_print(), :-, ()->-), :term],
 
         :term => [:factor],
-        :term => [:factor, Atom(:*, ()->*, generic_infix_print()), :factor],
-        :term => [:factor, Atom(:/, ()->/, generic_infix_print()), :factor],
+        :term => [:factor, Atom(infix_print(), :*, ()->*), :factor],
+        :term => [:factor, Atom(infix_print(), :/, ()->/), :factor],
 
-        :factor => [Atom(:number, ()->rand(-10:10))],
-        :factor => [Atom(:parent, ()->"()", print_parent), :expr]
+        :factor => [Atom(gp_default_print, :number, ()->rand(-10:10))],
+        :factor => [Atom(infix_print("(", ")"), :parent, ()->"()"), :expr]
     ]
-    gp_config = GPConfig(
-                    rules
-                )
+    gp_config = GPConfig(rules)
 
     @test gp_print(build_individual(gp_config, :expr)) == "4 * (((0) + -6) * 0) - (-4 * 8)"
     @test gp_print(build_individual(gp_config, :expr)) == "-7 * (3 + (7 * -4) * ((1) / (7) + 3 / -3)) + (-6 * ((-8) / (9) + 6 / (1)) - (-1 * 6 - -5 / (0))) / 6"

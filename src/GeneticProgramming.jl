@@ -1,8 +1,8 @@
 module GeneticProgramming
 
-using Infiltrator
 using Random
 
+#using Infiltrator
 export GPNode
 export number_of_children, gp_type, gp_value, gp_children
 export gp_eval, gp_print, gp_copy, gg_type
@@ -11,7 +11,26 @@ export gp_number
 export GPConfig
 export Atom
 export build_individual, mutate
-export generic_infix_print, generic_prefix_print
+export infix_print, minimal_infix_print, prefix_print, gp_default_print
+
+# Atom in the grammar (contained in the rules)
+struct Atom
+    id::Symbol
+    value_factory::Function
+    print::Function
+
+    function Atom(;print::Function=gp_default_print, id::Symbol=Symbol("UNK"), value_factory::Function=()->nothing)
+        return Atom(print, id, value_factory)
+    end
+
+    function Atom(print::Function=gp_default_print, id::Symbol=Symbol("UNK"), value_factory::Function=()->nothing)
+        return new(id, value_factory, print)
+    end
+
+    function Atom(id::Symbol=Symbol("UNK"), value_factory::Function=()->nothing)
+        return new(id, value_factory, gp_default_print)
+    end
+end
 
 struct GPNode
     type::Symbol
@@ -29,6 +48,14 @@ struct GPNode
         )
         return new(type, value, children, print, producing_rule)
     end
+
+    function GPNode(
+        atom::Atom,
+        children::Vector{GPNode}=GPNode[],
+        producing_rule::Pair{Symbol, Vector{Any}}=:UNDEFINED=>[]
+    )
+        return new(atom.id, atom.value_factory(), children, atom.print, producing_rule)
+    end
 end
 
 gp_type(n::GPNode) = n.type
@@ -38,7 +65,7 @@ number_of_children(n::GPNode) = length(gp_children(n))
 
 # Return a collection of strings
 function gp_default_print(n::GPNode, res::Vector{String})
-    return generic_prefix_print("( ", ", ", " )")(n, res)
+    return prefix_print("( ", ", ", " )")(n, res)
 end
 
 function gp_eval(n::GPNode)
@@ -141,26 +168,25 @@ function build_individual(gp::GPConfig, id::Symbol, depth::Int64, width::Int64)
         @assert length(terminal_atoms) == 1
         terminal_atom = first(terminal_atoms)
         non_atoms = filter(elem -> !(elem isa Atom), last(selected_rule))
-        @infiltrate !isempty(filter(x -> !(x isa Symbol), non_atoms))
+        #@infiltrate !isempty(filter(x -> !(x isa Symbol), non_atoms))
         children::Vector{GPNode} = [build_individual(gp, an_id, depth+1, width+length(non_atoms)) for an_id in non_atoms]
-        return GPNode(terminal_atom.id, terminal_atom.value_factory(), children, terminal_atom.print, selected_rule)
+        # return GPNode(terminal_atom.id, terminal_atom.value_factory(), children, terminal_atom.print, selected_rule)
+        return GPNode(terminal_atom, children, selected_rule)
     end
 end
 
-# Atom in the grammar (contained in the rules)
-struct Atom
-    id::Symbol
-    value_factory::Function
-    print::Function
+# Produce:
+#   outer_before CHILD1 inner_before VALUE inner_after CHILD2 outer_after
+#   outer_before CHILD1 inner_before VALUE inner_after CHILD2 inner_before VALUE inner_after CHILD3 outer_after
+minimal_infix_print(outer_before::String="", outer_after::String="") =
+    infix_print(outer_before, outer_after, "", "")
 
-    function Atom(id::Symbol, value_factory::Function=()->nothing, print::Function=gp_default_print)
-        return new(id, value_factory, print)
-    end
-end
+#function infix_print(outer_before::String="", inner_before::String=" ", inner_after::String=" ", outer_after::String="")
+function infix_print(outer_before::String="", outer_after::String="", inner_before::String=" ", inner_after::String=inner_before)
 
-function generic_infix_print(outer_before::String="", inner_before::String=" ", inner_after::String=" ", outer_after::String="")
     return (n::GPNode, res::Vector{String}) -> begin
         push!(res, outer_before)
+        #@infiltrate
         foreach((index, child)->
             begin
                 gp_print(child, res)
@@ -175,7 +201,7 @@ function generic_infix_print(outer_before::String="", inner_before::String=" ", 
     end
 end
 
-function generic_prefix_print(outer_before::String, inner::String, outer_after::String)
+function prefix_print(outer_before::String, inner::String, outer_after::String)
     return (n::GPNode, res::Vector{String}) -> begin
         push!(res, string(gp_value(n)))
         number_of_children(n) == 0 && return
