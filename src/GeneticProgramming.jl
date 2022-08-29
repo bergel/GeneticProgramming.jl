@@ -183,7 +183,6 @@ minimal_infix_print(outer_before::String="", outer_after::String="") =
 
 #function infix_print(outer_before::String="", inner_before::String=" ", inner_after::String=" ", outer_after::String="")
 function infix_print(outer_before::String="", outer_after::String="", inner_before::String=" ", inner_after::String=inner_before)
-
     return (n::GPNode, res::Vector{String}) -> begin
         push!(res, outer_before)
         #@infiltrate
@@ -192,8 +191,10 @@ function infix_print(outer_before::String="", outer_after::String="", inner_befo
                 gp_print(child, res)
                 if(index !== number_of_children(n))
                     push!(res, inner_before)
-                    push!(res, string(gp_value(n)))
-                    push!(res, inner_after)
+                    if !isnothing(gp_value(n))
+                        push!(res, string(gp_value(n)))
+                        push!(res, inner_after)
+                    end
                 end
             end,
             1:number_of_children(n), gp_children(n))

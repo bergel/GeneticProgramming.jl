@@ -40,8 +40,14 @@ end
     @test gp_print(mutate(gp, ind)) == "((4 + ((-3 + -9) + 0)) + 4)"
 end
 
-@testset "Atom" begin
-    #atom = Atom()
+@testset "Printing infix" begin
+    rules = [
+        :nbits => [Atom(;value_factory=()->rand([8, 16, 32, 64, 128]))],
+        :value => [Atom(;id=:SignedInt, print=infix_print("int[", "]", ", ")), :nbits, :numberInt],
 
-    #@test gp_print(atom) == ""
+        :numberInt => [Atom(:number, ()->rand(-10:10))],
+    ]
+    gp = GPConfig(rules)
+    ind = build_individual(gp, :value)
+    @test gp_print(ind) == "int[32, 4]"
 end
