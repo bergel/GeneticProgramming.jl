@@ -111,3 +111,17 @@ end
     @test has_parent(n_add)
     @test n_add.parent == n_mult
 end
+
+@testset "No more than one parent" begin
+    node = GPNode(:Number, 42)
+    another_node = GPNode(:Number, 41, [node])
+    @test node.parent == another_node
+
+    local t::Bool = false
+    try
+        GPNode(:Number, 40, [node])
+    catch
+        t = true
+    end
+    @test t == true
+end

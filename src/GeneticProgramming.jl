@@ -65,8 +65,9 @@ mutable struct GPNode
         new_node = new(type, value, children, print, producing_rule, parent)
 
         # We set the parent node
-        for n in children
-            n.parent = new_node
+        for child in children
+            @assert !has_parent(child)
+            child.parent = new_node
         end
         return new_node
     end
