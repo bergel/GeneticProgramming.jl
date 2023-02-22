@@ -2,7 +2,6 @@ module GeneticProgramming
 
 using Random
 
-#using Infiltrator
 export GPNode
 export number_of_children, gp_type, gp_value, gp_children
 export gp_eval, gp_print, gp_copy, gg_type
@@ -13,23 +12,38 @@ export Atom
 export build_individual, mutate
 export infix_print, minimal_infix_print, prefix_print, gp_default_print
 
+struct UseContext end
 # Atom in the grammar (contained in the rules)
 struct Atom
     id::Symbol
     value_factory::Function
     print::Function
+    use_context::Bool
 
     function Atom(;print::Function=gp_default_print, id::Symbol=Symbol("UNK"), value_factory::Function=()->nothing)
         return Atom(print, id, value_factory)
     end
 
     function Atom(print::Function=gp_default_print, id::Symbol=Symbol("UNK"), value_factory::Function=()->nothing)
-        return new(id, value_factory, print)
+        return new(id, value_factory, print, false)
     end
 
     function Atom(id::Symbol=Symbol("UNK"), value_factory::Function=()->nothing)
-        return new(id, value_factory, gp_default_print)
+        return new(id, value_factory, gp_default_print, false)
     end
+
+    function Atom(uc::UseContext; print::Function=gp_default_print, id::Symbol=Symbol("UNK"), value_factory::Function=()->nothing)
+        return Atom(uc, print, id, value_factory)
+    end
+
+    function Atom(::UseContext, print::Function=gp_default_print, id::Symbol=Symbol("UNK"), value_factory::Function=()->nothing)
+        return new(id, value_factory, print, true)
+    end
+
+    function Atom(::UseContext, id::Symbol=Symbol("UNK"), value_factory::Function=()->nothing)
+        return new(id, value_factory, gp_default_print, true)
+    end
+
 end
 
 struct GPNode
