@@ -125,3 +125,12 @@ end
     end
     @test t == true
 end
+
+@testset "Copying and parent" begin
+    node = GPNode(:Number, 42)
+    another_node = GPNode(:Number, 41, [node])
+    @test another_node.children[1].parent == another_node
+
+    another_node_copy = gp_copy(another_node)
+    @test another_node_copy.children[1].parent == another_node_copy
+end
