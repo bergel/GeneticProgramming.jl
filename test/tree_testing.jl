@@ -90,3 +90,24 @@ end
     n_copy = gp_copy(n_mult)
     @test !(n_copy === n_mult)
 end
+
+@testset "Parent" begin
+    n_number1 = GPNode(:Number, 40)
+    n_number2 = GPNode(:Number, 2)
+
+    @test !has_parent(n_number1)
+    @test !has_parent(n_number2)
+
+    n_add = GPNode(:Addition, +, [n_number1, n_number2])
+
+    @test has_parent(n_number1)
+    @test has_parent(n_number2)
+    @test n_number1.parent == n_add
+    @test n_number2.parent == n_add
+    @test !has_parent(n_add)
+
+    n_mult = GPNode(:Mult, *, [n_add, GPNode(:Number, 10)])
+    @test !has_parent(n_mult)
+    @test has_parent(n_add)
+    @test n_add.parent == n_mult
+end

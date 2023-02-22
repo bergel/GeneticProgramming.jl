@@ -6,6 +6,7 @@ export GPNode
 export number_of_children, gp_type, gp_value, gp_children
 export gp_eval, gp_print, gp_copy, gg_type
 export gp_number
+export has_parent
 
 export GPConfig
 export Atom
@@ -45,21 +46,29 @@ struct Atom
     end
 end
 
-struct GPNode
+mutable struct GPNode
     type::Symbol
     value::Any
     children::Vector{GPNode}
     print::Function
     producing_rule::Pair{Symbol, Vector{Any}}
+    parent::Union{GPNode,Nothing}
 
     function GPNode(
             type::Symbol=:UNDEFINED,
             value::Any=nothing,
             children::Vector{GPNode}=GPNode[],
             print::Function=gp_default_print,
-            producing_rule::Pair{Symbol, Vector{Any}}=:UNDEFINED=>[]
+            producing_rule::Pair{Symbol, Vector{Any}}=:UNDEFINED=>[],
+            parent::Union{GPNode,Nothing}=nothing
         )
-        return new(type, value, children, print, producing_rule)
+        new_node = new(type, value, children, print, producing_rule, parent)
+
+        # We set the parent node
+        for n in children
+            n.parent = new_node
+        end
+        return new_node
     end
 
     function GPNode(
@@ -71,6 +80,7 @@ struct GPNode
     end
 end
 
+has_parent(n::GPNode) = !isnothing(n.parent)
 gp_type(n::GPNode) = n.type
 gp_value(n::GPNode) = n.value
 gp_children(n::GPNode) = n.children
