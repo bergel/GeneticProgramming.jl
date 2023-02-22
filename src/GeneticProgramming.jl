@@ -43,7 +43,6 @@ struct Atom
     function Atom(::UseContext, id::Symbol=Symbol("UNK"), value_factory::Function=()->nothing)
         return new(id, value_factory, gp_default_print, true)
     end
-
 end
 
 struct GPNode
