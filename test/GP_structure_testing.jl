@@ -160,3 +160,59 @@ end
     @test gp_print(build_individual(gp_config, :expr)) == "(((2) / -5 - 1) / 9 - ((7) / 10 + (-2))) + (((-6) * 9 + -10) - -9 / -6)"
     @test gp_print(build_individual(gp_config, :expr)) == "(((5) / -8 - (-7) / 2) - -10 * -4) * (((4) / (8) + (0) / 5)) + (-8 * ((-10) * 1 + 1 / -6) + (-9 / 7) * -3) / (((-10) / 1) + ((-7) / (2) - (9) * (-10)))"
 end
+
+@testset "Local variables" begin
+    function print_block(n::GPNode, res::Vector{String})
+        push!(res, "[:")
+        gp_print(gp_children(n)[1], res)
+        push!(res, " | ")
+        gp_print(gp_children(n)[2], res)
+        push!(res, "]")
+
+    end
+
+    rules = [
+        :expr => [:variable],
+        :expr => [:sum_of_two_variables],
+        #:expr => [ Atom(infix_print(), :+), :variable, :variable, :variable],
+        :expr => [:block],
+        :tmp_variable => [Atom(gp_default_print, :tmp_variable, () -> "X")],
+
+        :sum_of_two_variables => [Atom(infix_print(), :+, () -> "+"), :variable, :variable],
+
+        :block => [Atom(print_block), :tmp_variable, :expr],
+
+        :number => [Atom(gp_default_print, :number, ()->rand(-10:10))],
+        :variable => [Atom(gp_default_print, :variable, () -> "X")],
+    ]
+
+    # RAW generation, without local variables
+    gp_config = GPConfig(rules)
+    @test gp_print(build_individual(gp_config, :expr)) == "X + X"
+    @test gp_print(build_individual(gp_config, :expr)) == "[:X | [:X | X + X]]"
+
+    # Renaming some variables
+    gp_config = GPConfig(rules)
+    ast = build_individual(gp_config, :expr)
+    gp_replace!(:variable, (index) -> string(collect('A':'Z')[index]), ast)
+    @test gp_print(ast) == "A + B"
+
+    # Renaming a block of a block
+    original_ast = build_individual(gp_config, :expr)
+    ast = gp_copy(original_ast)
+    gp_replace!(:tmp_variable, (index) -> string(collect('A':'Z')[index]), ast)
+    @test gp_print(ast) == "[:A | [:B | X + X]]"
+
+    # We collect tmp_variables and replace :variable by any collected tmp_variables
+    a = gp_collect_and_replace(ast, :tmp_variable, :variable, (set_of_tmp_variable) -> rand(set_of_tmp_variable))
+    @test gp_print(a) == "[:A | [:B | B + A]]"
+
+    a = gp_collect_and_replace(ast, :tmp_variable, :variable, (set_of_tmp_variable) -> rand(set_of_tmp_variable))
+    @test gp_print(a) == "[:A | [:B | A + A]]"
+
+    a = gp_collect_and_replace(ast, :tmp_variable, :variable, (set_of_tmp_variable) -> rand(set_of_tmp_variable))
+    @test gp_print(a) == "[:A | [:B | A + A]]"
+
+    a = gp_collect_and_replace(ast, :tmp_variable, :variable, (set_of_tmp_variable) -> rand(set_of_tmp_variable))
+    @test gp_print(a) == "[:A | [:B | A + B]]"
+end

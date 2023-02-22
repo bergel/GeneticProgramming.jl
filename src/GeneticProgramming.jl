@@ -7,6 +7,7 @@ export number_of_children, gp_type, gp_value, gp_children
 export gp_eval, gp_print, gp_copy, gg_type
 export gp_number
 export has_parent
+export gp_replace!, gp_collect_and_replace!, gp_collect_and_replace
 
 export GPConfig
 export Atom
@@ -46,6 +47,7 @@ struct Atom
     end
 end
 
+# GPNode is set as mutable since we need to set the parent link
 mutable struct GPNode
     type::Symbol
     value::Any
@@ -79,6 +81,19 @@ mutable struct GPNode
     )
         return new(atom.id, atom.value_factory(), children, atom.print, producing_rule)
     end
+
+     function GPNode(
+        parent::GPNode,
+        atom::Atom,
+        children::Vector{GPNode}=GPNode[],
+        producing_rule::Pair{Symbol, Vector{Any}}=:UNDEFINED=>[],
+    )
+        return new(atom.id, atom.value_factory(GPContext(parent)), children, atom.print, producing_rule, parent)
+    end
+end
+
+struct GPContext
+    parent::GPNode
 end
 
 has_parent(n::GPNode) = !isnothing(n.parent)
@@ -271,6 +286,56 @@ function replace_node(root::GPNode, from::GPNode, to::GPNode)
         return
     end
     foreach(nn->replace_node(nn, from, to), gp_children(root))
+end
+
+function gp_replace!(type_to_replace::Symbol, transformation::Function, ast::GPNode, index::Int64=1)
+    if ast.type == type_to_replace
+        ast.value = transformation(index)
+    end
+    global_index = index
+    for child in ast.children
+        gp_replace!(type_to_replace, transformation, child, global_index)
+        global_index = global_index + 1
+    end
+end
+
+function gp_collect_and_replace!(
+    ast::GPNode,
+    type_to_be_collected::Symbol,
+    type_to_be_replaced::Symbol,
+    transformation::Function,
+    collected_values::Vector{Any}=[]
+)
+    # Collect value at the same level of the node
+    if ast.type == type_to_be_collected
+        push!(collected_values, ast.value)
+    end
+
+    # Collect value from children
+    for child in ast.children
+        if child.type == type_to_be_collected
+            push!(collected_values, child.value)
+        end
+    end
+
+    if ast.type == type_to_be_replaced && !isempty(collected_values)
+        ast.value = transformation(collected_values)
+    end
+
+    for child in ast.children
+        gp_collect_and_replace!(child, type_to_be_collected, type_to_be_replaced, transformation, copy(collected_values))
+    end
+end
+
+function gp_collect_and_replace(
+    ast::GPNode,
+    type_to_be_collected::Symbol,
+    type_to_be_replaced::Symbol,
+    transformation::Function,
+)
+    ast_copy = gp_copy(ast)
+    gp_collect_and_replace!(ast_copy, type_to_be_collected, type_to_be_replaced, transformation)
+    return ast_copy
 end
 
 end # module
