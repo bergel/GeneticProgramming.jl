@@ -40,6 +40,27 @@ end
     @test gp_print(mutate(gp, ind)) == "((4 + ((-3 + -9) + 0)) + 4)"
 end
 
+@testset "Crossover" begin
+    rules = [
+        :expr => [:expr, Atom(infix_print("(", ")"), :+, ()->"+"), :expr]
+        :expr => [Atom(:number, ()->rand(-10:10))]
+    ]
+
+    gp = GPConfig(rules; maximum_width=5)
+    ind1 = build_individual(gp)
+    @test gp_print(ind1) == "((4 + -7) + 4)"
+    ind2 = build_individual(gp)
+    @test gp_print(ind2) == "((3 + -5) + -9)"
+
+    @test gp_print(crossover(gp, ind1, ind2)) == "((3 + -7) + 4)"
+    @test gp_print(crossover(gp, ind1, ind2)) == "((-5 + -7) + 4)"
+    @test gp_print(crossover(gp, ind1, ind2)) == "((3 + -5) + 4)"
+
+    # Parents are preserved
+    @test gp_print(ind1) == "((4 + -7) + 4)"
+    @test gp_print(ind2) == "((3 + -5) + -9)"
+end
+
 @testset "Printing infix" begin
     rules = [
         :nbits => [Atom(;value_factory=()->rand([8, 16, 32, 64, 128]))],

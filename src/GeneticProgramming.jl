@@ -11,8 +11,11 @@ export gp_replace!, gp_collect_and_replace!, gp_collect_and_replace
 
 export GPConfig
 export Atom
-export build_individual, mutate
+export build_individual, mutate, crossover
 export infix_print, minimal_infix_print, prefix_print, gp_default_print
+
+export GPSearch
+export rungp
 
 struct UseContext end
 # Atom in the grammar (contained in the rules)
@@ -136,7 +139,6 @@ function gp_copy(n::GPNode)
 end
 
 # GENETIC PROGRAMMING
-
 struct GPConfig
     root::Symbol
     rules::Vector{Pair{Symbol, Vector{Any}}}
@@ -163,6 +165,88 @@ struct GPConfig
             minimum_width,
             maximum_width)
     end
+end
+
+mutable struct GPSearch
+    config::GPConfig
+    fitness::Function
+    comparison::Function
+
+    population_size::Int64
+    max_generations::Int64
+
+    GPSearch(config::GPConfig) = GPSearch(config, fitness=(ind)->gp_eval(ind), comparison=<)
+    GPSearch(config::GPConfig, fitness::Function, comparison::Function) =
+        GPSearch(config, fitness, comparison, 10, 10)
+    GPSearch(config::GPConfig, fitness::Function, comparison::Function, population_size::Int64, max_generations::Int64) =
+        new(config, fitness, comparison, population_size, max_generations)
+
+end
+
+mutable struct GPResult
+    fitnesses::Vector{Number}
+    best_individuals::Vector{GPNode}
+    fitness::Number
+    best::GPNode
+    GPResult() = new(Number[], GPNode[], 0, GPNode())
+end
+
+function select(population::Vector{GPNode}, gp::GPSearch, k::Int64=5)
+    local best::GPNode = population[1]
+    local best_fitness = gp.fitness(best)
+    for i in 1:k
+        ind = rand(population)
+        f = gp.fitness(ind)
+        if gp.comparison(f, best_fitness)
+            best = ind
+            best_fitness = f
+        end
+    end
+    return best
+end
+
+function best_of_population(gp::GPSearch, population::Vector{GPNode})
+    local best_ind = nothing
+    for ind in population
+        if isnothing(best_ind)
+            best_ind = ind
+        else
+            if gp.comparison(gp.fitness(ind), gp.fitness(best_ind))
+                best_ind = ind
+            end
+        end
+    end
+    return best_ind
+end
+
+function rungp(gp::GPSearch)
+    local result = GPResult()
+    local initial_population::Vector{GPNode} #MAYBE NOT NECESSARY
+    local new_population::Vector{GPNode} #MAYBE NOT NECESSARY
+    local config = gp.config
+    local old_population
+
+    initial_population = GPNode[build_individual(gp.config) for _ in 1:gp.population_size]
+    old_population = initial_population
+
+    for _ in 1:gp.max_generations
+        new_population = GPNode[]
+        local best_ind = nothing
+        push!(new_population, best_of_population(gp, old_population))
+        for __ in 1:(gp.population_size-1)
+            ind1 = select(old_population, gp)
+            ind2 = select(old_population, gp)
+            new_ind = mutate(config, crossover(config, ind1, ind2))
+            push!(new_population, new_ind)
+        end
+        best_ind = best_of_population(gp, new_population)
+        push!(result.best_individuals, best_ind)
+        push!(result.fitnesses, gp.fitness(best_ind))
+        old_population = new_population
+    end
+    result.best = last(result.best_individuals)
+    result.fitness = last(result.fitnesses)
+    return result
 end
 
 function candidate_rules(gp::GPConfig, id::Symbol)
@@ -268,6 +352,41 @@ end
 function enumerate_nodes(n::GPNode, res::Vector{GPNode})
     push!(res, n)
     foreach(nn->enumerate_nodes(nn, res), gp_children(n))
+end
+
+function are_from_same_production_rule(ind1::GPNode, ind2::GPNode)
+    return ind1.producing_rule == ind2.producing_rule
+end
+
+function crossover(gp::GPConfig, ind1::GPNode, ind2::GPNode)
+    # We try several time before returning an error
+    for _ in 1:5
+        t = _crossover(gp, ind1, ind2)
+        !isnothing(t) && return t
+    end
+    error("Cannot perform a crossover")
+    return nothing
+end
+
+function _crossover(gp::GPConfig, ind1::GPNode, ind2::GPNode)
+    # Select a node in ind1
+    copy_ind1 = gp_copy(ind1)
+    all_subnodes_ind1 = enumerate_nodes(copy_ind1)[2:end]
+    selected_remplacement_node_in_ind1 = rand(all_subnodes_ind1)
+
+    # Select a corresponding node in ind2
+    all_subnodes_ind2 = enumerate_nodes(ind2)[2:end]
+    all_matching_subnodes_ind2 = filter((node)->are_from_same_production_rule(node, selected_remplacement_node_in_ind1), all_subnodes_ind2)
+
+    # Check if there is a node to be selected. If none, then simply return nothing to retry
+    isempty(all_matching_subnodes_ind2) && return nothing
+
+    # Pick the portion of ind2
+    selected_node_in2 = rand(all_matching_subnodes_ind2)
+
+    # We produce the new node
+    replace_node(copy_ind1, selected_remplacement_node_in_ind1, selected_node_in2)
+    return copy_ind1
 end
 
 function mutate(gp::GPConfig, n::GPNode)
