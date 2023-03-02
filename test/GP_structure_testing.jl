@@ -241,12 +241,20 @@ end
         :expr => [Atom(; print=infix_print(), value_factory=()->+), :number, :expr],
         :number => [Atom(; value_factory=() -> rand([1, 3, 7]))]
     ]
-    config = GPConfig(rules; minimum_depth=1, maximum_depth=1)
+    config = GPConfig(rules; minimum_depth=1, maximum_depth=2)
 
     n = GPNode(:Addition, +, [GPNode(:Number, 40), GPNode(:Number, 2)])
     @test gp_depth(n) == 1
-    #@test gp_width(n) == 2
+    @test gp_width(n) == 2
 
-    #@test match_constraints(config, n)
+    @test match_constraints(config, n)
 
+    n = GPNode(:Addition, +, [
+            GPNode(:Addition, +, [
+                GPNode(:Addition, +, [GPNode(:Number, 40), GPNode(:Number, 2)]),
+                GPNode(:Number, 2)
+            ]),
+            GPNode(:Number, 2)
+        ])
+    @test !match_constraints(config, n)
 end

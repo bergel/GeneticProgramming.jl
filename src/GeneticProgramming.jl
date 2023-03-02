@@ -393,7 +393,8 @@ function _crossover(gp::GPConfig, ind1::GPNode, ind2::GPNode)
 end
 
 function match_constraints(gp::GPConfig, node::GPNode)
-
+    return  gp.minimum_depth <= gp_depth(node) <= gp.maximum_depth &&
+            gp.minimum_width <= gp_width(node) <= gp.maximum_width
 end
 
 function mutate(gp::GPConfig, n::GPNode)
