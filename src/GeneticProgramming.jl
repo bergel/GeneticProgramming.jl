@@ -364,9 +364,10 @@ function crossover(gp::GPConfig, ind1::GPNode, ind2::GPNode)
     # We try several time before returning an error
     for _ in 1:5
         t = _crossover(gp, ind1, ind2)
-        #!isnothing(t) && match_constraints(gp, t) && return t
-        !isnothing(t) && return t
+        !isnothing(t) && match_constraints(gp, t) && return t
+        #!isnothing(t) && return t
     end
+    isdefined(Main, :Infiltrator) && Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
     error("Cannot perform a crossover")
     return nothing
 end
@@ -398,6 +399,16 @@ function match_constraints(gp::GPConfig, node::GPNode)
 end
 
 function mutate(gp::GPConfig, n::GPNode)
+    # We try several time before returning an error
+    for _ in 1:5
+        t = _mutate(gp, n)
+        match_constraints(gp, t) && return t
+    end
+    error("Cannot perform a crossover")
+    return nothing
+end
+
+function _mutate(gp::GPConfig, n::GPNode)
     n_copy = gp_copy(n)
     all_subnodes = enumerate_nodes(n_copy)[2:end]
     selected_remplacement_node = rand(all_subnodes)
