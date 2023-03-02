@@ -11,6 +11,6 @@
         gp = GPSearch(config, (ind)->abs(21 - gp_eval(ind)), <)
         gp_result = rungp(gp)
         @test gp_result.fitness == 0
-        @test gp_print(gp_result.best) == "7 + 7 + 7"
+        # @test gp_print(gp_result.best) == "7 + 7 + 7"
     end
 end

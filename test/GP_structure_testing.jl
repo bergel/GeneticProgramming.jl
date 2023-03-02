@@ -216,3 +216,37 @@ end
     a = gp_collect_and_replace(ast, :tmp_variable, :variable, (set_of_tmp_variable) -> rand(set_of_tmp_variable))
     @test gp_print(a) == "[:A | [:B | A + B]]"
 end
+
+@testset "Depth and width" begin
+    depth1_width2 = GPNode(:Addition, +, [GPNode(:Number, 40), GPNode(:Number, 2)])
+    depth2_width3 = GPNode(:Addition, +, [depth1_width2, GPNode(:Number, 2)])
+    depth3_width4 = GPNode(:Addition, +, [
+                        GPNode(:Addition, +, [
+                            GPNode(:Addition, +, [GPNode(:Number, 40), GPNode(:Number, 2)])
+                            ]),
+                        GPNode(:Addition, +, [GPNode(:Number, 40), GPNode(:Number, 2)])])
+
+    @test gp_depth(depth1_width2) == 1
+    @test gp_depth(depth2_width3) == 2
+    @test gp_depth(depth3_width4) == 3
+
+    @test gp_width(depth1_width2) == 2
+    @test gp_width(depth2_width3) == 3
+    @test gp_width(depth3_width4) == 4
+end
+
+@testset "Match constraints" begin
+    rules = [
+        :expr => [:number],
+        :expr => [Atom(; print=infix_print(), value_factory=()->+), :number, :expr],
+        :number => [Atom(; value_factory=() -> rand([1, 3, 7]))]
+    ]
+    config = GPConfig(rules; minimum_depth=1, maximum_depth=1)
+
+    n = GPNode(:Addition, +, [GPNode(:Number, 40), GPNode(:Number, 2)])
+    @test gp_depth(n) == 1
+    #@test gp_width(n) == 2
+
+    #@test match_constraints(config, n)
+
+end

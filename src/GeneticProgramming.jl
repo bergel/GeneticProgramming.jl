@@ -8,6 +8,8 @@ export gp_eval, gp_print, gp_copy, gg_type
 export gp_number
 export has_parent
 export gp_replace!, gp_collect_and_replace!, gp_collect_and_replace
+export match_constraints
+export gp_depth, gp_width
 
 export GPConfig
 export Atom
@@ -362,6 +364,7 @@ function crossover(gp::GPConfig, ind1::GPNode, ind2::GPNode)
     # We try several time before returning an error
     for _ in 1:5
         t = _crossover(gp, ind1, ind2)
+        #!isnothing(t) && match_constraints(gp, t) && return t
         !isnothing(t) && return t
     end
     error("Cannot perform a crossover")
@@ -387,6 +390,10 @@ function _crossover(gp::GPConfig, ind1::GPNode, ind2::GPNode)
     # We produce the new node
     replace_node(copy_ind1, selected_remplacement_node_in_ind1, selected_node_in2)
     return copy_ind1
+end
+
+function match_constraints(gp::GPConfig, node::GPNode)
+
 end
 
 function mutate(gp::GPConfig, n::GPNode)
@@ -455,6 +462,30 @@ function gp_collect_and_replace(
     ast_copy = gp_copy(ast)
     gp_collect_and_replace!(ast_copy, type_to_be_collected, type_to_be_replaced, transformation)
     return ast_copy
+end
+
+function gp_depth(n::GPNode, _accumulator::Int64=0)
+    number_of_children(n) == 0 && return _accumulator
+
+    tt = [gp_depth(nn) for nn in n.children]
+    return _accumulator + max(tt...) + 1
+end
+
+# Number of leaves
+function gp_width(n::GPNode)
+    local accumulator::Int64
+    accumulator = 0
+    function _run(n::GPNode)
+        if number_of_children(n) == 0
+            accumulator += 1
+        else
+            for nn in n.children
+                _run(nn)
+            end
+        end
+    end
+    _run(n)
+    return accumulator
 end
 
 end # module
