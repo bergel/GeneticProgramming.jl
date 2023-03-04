@@ -82,7 +82,7 @@ end
     gp_config = GPConfig(
                     rules;
                     minimum_depth=7,
-                    maximum_depth=10
+                    maximum_depth=10,
                 )
 
     ind = build_individual(gp_config, :chain)
@@ -155,10 +155,10 @@ end
     ]
     gp_config = GPConfig(rules)
 
-    @test gp_print(build_individual(gp_config, :expr)) == "4 * (((0) + -6) * 0) - (-4 * 8)"
-    @test gp_print(build_individual(gp_config, :expr)) == "-7 * (3 + (7 * -4) * ((1) / (7) + 3 / -3)) + (-6 * ((-8) / (9) + 6 / (1)) - (-1 * 6 - -5 / (0))) / 6"
-    @test gp_print(build_individual(gp_config, :expr)) == "(((2) / -5 - 1) / 9 - ((7) / 10 + (-2))) + (((-6) * 9 + -10) - -9 / -6)"
-    @test gp_print(build_individual(gp_config, :expr)) == "(((5) / -8 - (-7) / 2) - -10 * -4) * (((4) / (8) + (0) / 5)) + (-8 * ((-10) * 1 + 1 / -6) + (-9 / 7) * -3) / (((-10) / 1) + ((-7) / (2) - (9) * (-10)))"
+    @test gp_print(build_individual(gp_config, :expr)) == "4 * (((0) + -6) * 0) + (-4 * 8)"
+    @test gp_print(build_individual(gp_config, :expr)) == "-7 * (3 + (7 * -4) * ((1) / (7) + 3 / -3))"
+    @test gp_print(build_individual(gp_config, :expr)) == "(10 + (4 / 3 - 10 / (2)) * -9) / ((-1 * 6 - -5 / (0)) + ((4))) - (2 + -4 * 1) / 9"
+    @test gp_print(build_individual(gp_config, :expr)) == "9 / (7 * 10 + ((7) * 0 + 10 * -7))"
 end
 
 @testset "Local variables" begin

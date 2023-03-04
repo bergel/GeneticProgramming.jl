@@ -134,3 +134,38 @@ end
     another_node_copy = gp_copy(another_node)
     @test another_node_copy.children[1].parent == another_node_copy
 end
+
+@testset "Replace node" begin
+    @testset "Inner node" begin
+        n_number1 = GPNode(:Number, 40)
+        n_number2 = GPNode(:Number, 2)
+        n_add = GPNode(:Addition, +, [n_number1, n_number2])
+
+        @test gp_print(n_add) == "+( 40, 2 )"
+        r = replace_node!(n_add, n_number1, GPNode(:Number, 41))
+        @test gp_print(n_add) == "+( 41, 2 )"
+        @test r === n_add
+    end
+
+    @testset "Root node" begin
+        n_number1 = GPNode(:Number, 40)
+        n_number2 = GPNode(:Number, 2)
+        n_add = GPNode(:Addition, +, [n_number1, n_number2])
+
+        @test gp_print(n_add) == "+( 40, 2 )"
+        r = replace_node!(n_add, n_add, GPNode(:Number, 41))
+        @test gp_print(r) == "41"
+        @test gp_print(n_add) == "+( 40, 2 )"
+        @test r !== n_add
+    end
+
+    @testset "Not existing node" begin
+        n_number1 = GPNode(:Number, 40)
+        n_number2 = GPNode(:Number, 2)
+        n_add = GPNode(:Addition, +, [n_number1, n_number2])
+
+        r = replace_node!(n_add, GPNode(:Number, 41), GPNode(:Number, 42))
+        @test gp_print(n_add) == "+( 40, 2 )"
+        @test r === n_add
+    end
+end

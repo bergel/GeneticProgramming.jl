@@ -7,9 +7,10 @@ export number_of_children, gp_type, gp_value, gp_children
 export gp_eval, gp_print, gp_copy, gg_type
 export gp_number
 export has_parent
-export gp_replace!, gp_collect_and_replace!, gp_collect_and_replace
+export gp_replace, gp_replace!, gp_collect_and_replace!, gp_collect_and_replace
 export match_constraints
 export gp_depth, gp_width
+export replace_node!
 
 export GPConfig
 export Atom
@@ -18,6 +19,8 @@ export infix_print, minimal_infix_print, prefix_print, gp_default_print
 
 export GPSearch
 export rungp
+
+export print_population # Good for debugging
 
 struct UseContext end
 # Atom in the grammar (contained in the rules)
@@ -148,14 +151,15 @@ struct GPConfig
     maximum_depth::Int64
     minimum_width::Int64
     maximum_width::Int64
+    seed::Int64
 
     function GPConfig(
             rules::Vector{Pair{Symbol,Vector{Any}}};
             root::Symbol=first(first(rules)),
             seed::Int64=42,
-            minimum_depth=1,
+            minimum_depth=0,
             maximum_depth=10,
-            minimum_width=1,
+            minimum_width=0,
             maximum_width=20
         )
         Random.seed!(seed)
@@ -165,11 +169,12 @@ struct GPConfig
             minimum_depth,
             maximum_depth,
             minimum_width,
-            maximum_width)
+            maximum_width,
+            seed)
     end
 end
 
-mutable struct GPSearch
+struct GPSearch
     config::GPConfig
     fitness::Function
     comparison::Function
@@ -177,11 +182,41 @@ mutable struct GPSearch
     population_size::Int64
     max_generations::Int64
 
+    rate_mutation::Float64
+    rate_crossover::Float64
+
+    termination::Function
+
     GPSearch(config::GPConfig) = GPSearch(config, fitness=(ind)->gp_eval(ind), comparison=<)
     GPSearch(config::GPConfig, fitness::Function, comparison::Function) =
-        GPSearch(config, fitness, comparison, 10, 10)
-    GPSearch(config::GPConfig, fitness::Function, comparison::Function, population_size::Int64, max_generations::Int64) =
-        new(config, fitness, comparison, population_size, max_generations)
+        GPSearch(config, fitness, comparison, 10, 10, 0.2, 0.6)
+    GPSearch(
+        config::GPConfig,
+        fitness::Function,
+        comparison::Function,
+        population_size::Int64,
+        max_generations::Int64,
+    ) =
+        new(config, fitness, comparison, population_size, max_generations, 0.2, 0.6)
+    GPSearch(
+        config::GPConfig,
+        fitness::Function,
+        comparison::Function,
+        population_size::Int64=10,
+        max_generations::Int64=10,
+        termination::Function=iszero,
+        rate_crossover::Float64=1.0,
+        rate_mutation::Float64=0.8,
+    ) =
+        new(config, fitness, comparison, population_size, max_generations, rate_mutation, rate_crossover, termination)
+
+    GPSearch(config::GPConfig, fitness::Function;
+            comparison::Function=<, population_size::Int64=10, max_generations::Int64=10,
+            rate_mutation::Float64=0.8, rate_crossover::Float64=1.0,
+            termination::Function=(f)->f==0
+            ) =
+        new(config, fitness, comparison, population_size, max_generations, rate_mutation, rate_crossover, termination)
+
 
 end
 
@@ -190,6 +225,7 @@ mutable struct GPResult
     best_individuals::Vector{GPNode}
     fitness::Number
     best::GPNode
+    last_population::Vector{GPNode}
     GPResult() = new(Number[], GPNode[], 0, GPNode())
 end
 
@@ -227,27 +263,73 @@ function rungp(gp::GPSearch)
     local new_population::Vector{GPNode} #MAYBE NOT NECESSARY
     local config = gp.config
     local old_population
+    local ind1
 
+    Random.seed!(gp.config.seed)
     initial_population = GPNode[build_individual(gp.config) for _ in 1:gp.population_size]
+
+    # Sanity check
+    for i in initial_population
+        if !match_constraints(gp.config, i)
+            isdefined(Main, :Infiltrator) && Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
+        end
+        @assert match_constraints(gp.config, i)
+    end
+
     old_population = initial_population
 
+    local result_crossover, ind1
     for _ in 1:gp.max_generations
         new_population = GPNode[]
         local best_ind = nothing
         push!(new_population, best_of_population(gp, old_population))
+
+       #print_population(old_population)
+
         for __ in 1:(gp.population_size-1)
-            ind1 = select(old_population, gp)
-            ind2 = select(old_population, gp)
-            new_ind = mutate(config, crossover(config, ind1, ind2))
+            #@assert match_constraints(gp.config, ind1)
+            #@assert match_constraints(gp.config, ind2)
+            #printstyled("$(gp_print(ind1))\n", color=:red)
+            #printstyled("$(gp_print(ind2))\n", color=:blue)
+
+            # Performing cross over
+            local result_crossover
+            local ind1
+            if rand() < gp.rate_crossover
+                for _ in 1:5
+                    ind1 = select(old_population, gp)
+                    ind2 = select(old_population, gp)
+
+                    result_crossover = crossover(config, ind1, ind2)
+                    !isnothing(result_crossover) && break
+                end
+                if isnothing(result_crossover)
+                    #@warn "Cannot perform a crossover between\nind1=$(gp_print(ind1))\n\nind2=$(gp_print(ind2))"
+                    result_crossover = gp_copy(ind1)
+                end
+            else
+                result_crossover = select(old_population, gp)
+            end
+            @assert match_constraints(gp.config, result_crossover)
+
+            if rand() < gp.rate_mutation
+                new_ind = mutate(config, result_crossover)
+            else
+                new_ind = result_crossover
+            end
+            @assert match_constraints(gp.config, new_ind)
+
             push!(new_population, new_ind)
         end
-        best_ind = best_of_population(gp, new_population)
+        best_ind = gp_copy(best_of_population(gp, new_population))
         push!(result.best_individuals, best_ind)
         push!(result.fitnesses, gp.fitness(best_ind))
         old_population = new_population
+        gp.termination(gp.fitness(best_ind)) && break
     end
     result.best = last(result.best_individuals)
     result.fitness = last(result.fitnesses)
+    result.last_population = old_population
     return result
 end
 
@@ -260,10 +342,16 @@ function build_individual(gp::GPConfig)
 end
 
 function build_individual(gp::GPConfig, id::Symbol)
-    return build_individual(gp, id, 1, 1)
+    local ind
+    for _ in 1:5
+        ind = _build_individual(gp, id, 1, 1)
+        match_constraints(gp, ind) && return ind
+    end
+    return ind
+    #error("Cannot create constrained individual")
 end
 
-function build_individual(gp::GPConfig, id::Symbol, depth::Int64, width::Int64)
+function _build_individual(gp::GPConfig, id::Symbol, depth::Int64, width::Int64)
     candidate_r = candidate_rules(gp, id)
     @assert !isempty(candidate_r) "No candidate rule found for \"$id\""
 
@@ -288,13 +376,13 @@ function build_individual(gp::GPConfig, id::Symbol, depth::Int64, width::Int64)
     if isempty(terminal_atoms)
         # We simply do a recursion
         @assert length(last(selected_rule)) == 1
-        return build_individual(gp, last(selected_rule)[1], depth+1, width)
+        return _build_individual(gp, last(selected_rule)[1], depth+1, width)
     else
         @assert length(terminal_atoms) == 1
         terminal_atom = first(terminal_atoms)
         non_atoms = filter(elem -> !(elem isa Atom), last(selected_rule))
         #@infiltrate !isempty(filter(x -> !(x isa Symbol), non_atoms))
-        children::Vector{GPNode} = [build_individual(gp, an_id, depth+1, width+length(non_atoms)) for an_id in non_atoms]
+        children::Vector{GPNode} = [_build_individual(gp, an_id, depth+1, width+length(non_atoms)) for an_id in non_atoms]
         # return GPNode(terminal_atom.id, terminal_atom.value_factory(), children, terminal_atom.print, selected_rule)
         return GPNode(terminal_atom, children, selected_rule)
     end
@@ -365,21 +453,18 @@ function crossover(gp::GPConfig, ind1::GPNode, ind2::GPNode)
     for _ in 1:5
         t = _crossover(gp, ind1, ind2)
         !isnothing(t) && match_constraints(gp, t) && return t
-        #!isnothing(t) && return t
     end
-    isdefined(Main, :Infiltrator) && Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
-    error("Cannot perform a crossover")
     return nothing
 end
 
 function _crossover(gp::GPConfig, ind1::GPNode, ind2::GPNode)
     # Select a node in ind1
     copy_ind1 = gp_copy(ind1)
-    all_subnodes_ind1 = enumerate_nodes(copy_ind1)[2:end]
+    all_subnodes_ind1 = enumerate_nodes(copy_ind1)[1:end]
     selected_remplacement_node_in_ind1 = rand(all_subnodes_ind1)
 
     # Select a corresponding node in ind2
-    all_subnodes_ind2 = enumerate_nodes(ind2)[2:end]
+    all_subnodes_ind2 = enumerate_nodes(gp_copy(ind2))[1:end]
     all_matching_subnodes_ind2 = filter((node)->are_from_same_production_rule(node, selected_remplacement_node_in_ind1), all_subnodes_ind2)
 
     # Check if there is a node to be selected. If none, then simply return nothing to retry
@@ -389,8 +474,7 @@ function _crossover(gp::GPConfig, ind1::GPNode, ind2::GPNode)
     selected_node_in2 = rand(all_matching_subnodes_ind2)
 
     # We produce the new node
-    replace_node(copy_ind1, selected_remplacement_node_in_ind1, selected_node_in2)
-    return copy_ind1
+    return replace_node!(copy_ind1, selected_remplacement_node_in_ind1, selected_node_in2)
 end
 
 function match_constraints(gp::GPConfig, node::GPNode)
@@ -398,32 +482,46 @@ function match_constraints(gp::GPConfig, node::GPNode)
             gp.minimum_width <= gp_width(node) <= gp.maximum_width
 end
 
+# This seems like an impossible problem to solve. Some ind cannot be properly mutated.
 function mutate(gp::GPConfig, n::GPNode)
+    local t
     # We try several time before returning an error
-    for _ in 1:5
+    for _ in 1:20
         t = _mutate(gp, n)
-        match_constraints(gp, t) && return t
+        gp_print(t) != gp_print(n) && match_constraints(gp, t) && return t
     end
-    error("Cannot perform a crossover")
+    return t
+#=     isdefined(Main, :Infiltrator) && Main.infiltrate(@__MODULE__, Base.@locals, @__FILE__, @__LINE__)
+    error("Cannot perform a mutation")
     return nothing
+ =#
 end
 
 function _mutate(gp::GPConfig, n::GPNode)
     n_copy = gp_copy(n)
-    all_subnodes = enumerate_nodes(n_copy)[2:end]
+    all_subnodes = enumerate_nodes(n_copy)[1:end]
     selected_remplacement_node = rand(all_subnodes)
     new_ind = build_individual(gp, first(selected_remplacement_node.producing_rule))
-    replace_node(n_copy, selected_remplacement_node, new_ind)
-    return n_copy
+    return replace_node!(n_copy, selected_remplacement_node, new_ind)
 end
 
-function replace_node(root::GPNode, from::GPNode, to::GPNode)
+# This function modifies the provided tree with root.
+# It returns the new tree.
+function replace_node!(root::GPNode, from::GPNode, to::GPNode)
+    root === from && return to
     if from in gp_children(root)
         children = gp_children(root)
         children[first(findall(x->x==from, gp_children(root)))] = to
-        return
+        return root
     end
-    foreach(nn->replace_node(nn, from, to), gp_children(root))
+    foreach(nn->replace_node!(nn, from, to), gp_children(root))
+    return root
+end
+
+function gp_replace(type_to_replace::Symbol, transformation::Function, ast::GPNode, index::Int64=1)
+    copy = gp_copy(ast)
+    gp_replace!(type_to_replace, transformation, copy)
+    return copy
 end
 
 function gp_replace!(type_to_replace::Symbol, transformation::Function, ast::GPNode, index::Int64=1)
@@ -498,6 +596,13 @@ function gp_width(n::GPNode)
     end
     _run(n)
     return accumulator
+end
+
+function print_population(population)
+    println("Population:")
+    for ind in population
+        println("   $(gp_print(ind))")
+    end
 end
 
 end # module
