@@ -168,4 +168,13 @@ end
         @test gp_print(n_add) == "+( 40, 2 )"
         @test r === n_add
     end
+
+    @testset "Collect" begin
+        n_number1 = GPNode(:Number, 40)
+        n_number2 = GPNode(:Number, 2)
+        n_add = GPNode(:Addition, +, [n_number1, n_number2])
+
+        r = gp_collect(n_add, :Number)
+        @test r == [n_number1, n_number2]
+    end
 end

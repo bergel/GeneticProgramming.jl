@@ -11,6 +11,7 @@ export gp_replace, gp_replace!, gp_collect_and_replace!, gp_collect_and_replace
 export match_constraints
 export gp_depth, gp_width
 export replace_node!
+export gp_collect
 
 export GPConfig
 export Atom
@@ -532,6 +533,23 @@ function gp_replace!(type_to_replace::Symbol, transformation::Function, ast::GPN
     for child in ast.children
         gp_replace!(type_to_replace, transformation, child, global_index)
         global_index = global_index + 1
+    end
+end
+
+function gp_collect(ast::GPNode, type_to_be_collected::Symbol)
+    result::Vector{GPNode}=[]
+    _gp_collect(ast, type_to_be_collected, result)
+    return result
+end
+
+function _gp_collect(ast::GPNode, type_to_be_collected::Symbol, collected_values::Vector{GPNode})
+    # Collect value at the same level of the node
+    if ast.type == type_to_be_collected
+        push!(collected_values, ast)
+    end
+
+    for child in ast.children
+        _gp_collect(child, type_to_be_collected, collected_values)
     end
 end
 
