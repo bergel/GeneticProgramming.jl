@@ -177,4 +177,13 @@ end
         r = gp_collect(n_add, :Number)
         @test r == [n_number1, n_number2]
     end
+
+    @testset "Replace node" begin
+        n_number1 = GPNode(:Number, 40)
+        n_number2 = GPNode(:Number, 2)
+        n_add = GPNode(:Addition, +, [n_number1, n_number2])
+
+        r = replace_node!(n_add, n_number1, GPNode(:Number, 42))
+        @test gp_print(r) == "+( 42, 2 )"
+    end
 end
