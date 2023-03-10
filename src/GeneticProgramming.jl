@@ -188,6 +188,8 @@ struct GPSearch
 
     termination::Function
 
+    fitness_cache::Dict{Any,Number}
+
     GPSearch(config::GPConfig) = GPSearch(config, fitness=(ind)->gp_eval(ind), comparison=<)
     GPSearch(config::GPConfig, fitness::Function, comparison::Function) =
         GPSearch(config, fitness, comparison, 10, 10, 0.2, 0.6)
@@ -209,14 +211,14 @@ struct GPSearch
         rate_crossover::Float64=1.0,
         rate_mutation::Float64=0.8,
     ) =
-        new(config, fitness, comparison, population_size, max_generations, rate_mutation, rate_crossover, termination)
+        new(config, fitness, comparison, population_size, max_generations, rate_mutation, rate_crossover, termination, Dict{Any,Number}())
 
     GPSearch(config::GPConfig, fitness::Function;
             comparison::Function=<, population_size::Int64=10, max_generations::Int64=10,
             rate_mutation::Float64=0.8, rate_crossover::Float64=1.0,
             termination::Function=(f)->f==0
             ) =
-        new(config, fitness, comparison, population_size, max_generations, rate_mutation, rate_crossover, termination)
+        new(config, fitness, comparison, population_size, max_generations, rate_mutation, rate_crossover, termination, Dict{Any,Number}())
 
 
 end
@@ -230,12 +232,25 @@ mutable struct GPResult
     GPResult() = new(Number[], GPNode[], 0, GPNode())
 end
 
+# Compute and cache fitness
+function compute_fitness(ind::GPNode, gp::GPSearch)
+    haskey(gp.fitness_cache, ind) && return gp.fitness_cache[ind]
+
+    f = gp.fitness(ind)
+    gp.fitness_cache[ind] = f
+    return f
+end
+
+function reset_fitness_cache(gp::GPSearch)
+    empty!(gp.fitness_cache)
+end
+
 function select(population::Vector{GPNode}, gp::GPSearch, k::Int64=5)
     local best::GPNode = population[1]
-    local best_fitness = gp.fitness(best)
+    local best_fitness = compute_fitness(best, gp)
     for i in 1:k
         ind = rand(population)
-        f = gp.fitness(ind)
+        f = compute_fitness(ind, gp)
         if gp.comparison(f, best_fitness)
             best = ind
             best_fitness = f
@@ -250,7 +265,7 @@ function best_of_population(gp::GPSearch, population::Vector{GPNode})
         if isnothing(best_ind)
             best_ind = ind
         else
-            if gp.comparison(gp.fitness(ind), gp.fitness(best_ind))
+            if gp.comparison(compute_fitness(ind, gp), compute_fitness(best_ind, gp))
                 best_ind = ind
             end
         end
@@ -324,9 +339,10 @@ function rungp(gp::GPSearch)
         end
         best_ind = gp_copy(best_of_population(gp, new_population))
         push!(result.best_individuals, best_ind)
-        push!(result.fitnesses, gp.fitness(best_ind))
+        push!(result.fitnesses, compute_fitness(best_ind, gp))
         old_population = new_population
-        gp.termination(gp.fitness(best_ind)) && break
+        gp.termination(compute_fitness(best_ind, gp)) && break
+        reset_fitness_cache(gp)
     end
     result.best = last(result.best_individuals)
     result.fitness = last(result.fitnesses)

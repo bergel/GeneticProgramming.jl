@@ -92,4 +92,24 @@
         @test gp_result.fitnesses[1] > gp_result.fitnesses[end]
         @test gp_print(gp_result.best) == "x + x + 1 + x + x * x + x"
     end
+
+    @testset "Number of fitness evaluation" begin
+        local nb = 0
+        rules = [
+            :expr => [Atom(; value_factory=()->"*")],
+            :expr => [Atom(; value_factory=()->"*"), :expr],
+        ]
+        config = GPConfig(rules; maximum_depth = 10)
+
+        function my_fitness(ind)
+            nb = nb + 1
+            return 10 - gp_depth(ind)
+        end
+
+        gp = GPSearch(config, my_fitness, <,
+                        30, 50, iszero)
+        gp_result = rungp(gp)
+        @test gp_depth(gp_result.best) == 10
+        @test nb < 300
+    end
 end
