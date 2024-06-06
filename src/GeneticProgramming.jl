@@ -392,6 +392,9 @@ function _build_individual(gp::GPConfig, id::Symbol, depth::Int64, width::Int64)
     terminal_atoms = filter(elem -> elem isa Atom, last(selected_rule))
     if isempty(terminal_atoms)
         # We simply do a recursion
+        if length(last(selected_rule)) != 1
+            @error "Missing rule for $(selected_rule)" selected_rule
+        end
         @assert length(last(selected_rule)) == 1
         return _build_individual(gp, last(selected_rule)[1], depth+1, width)
     else
@@ -408,8 +411,9 @@ end
 # Produce:
 #   outer_before CHILD1 inner_before VALUE inner_after CHILD2 outer_after
 #   outer_before CHILD1 inner_before VALUE inner_after CHILD2 inner_before VALUE inner_after CHILD3 outer_after
-minimal_infix_print(outer_before::String="", outer_after::String="") =
-    infix_print(outer_before, outer_after, "", "")
+function minimal_infix_print(outer_before::String="", outer_after::String="")
+    return infix_print(outer_before, outer_after, "", "")
+end
 
 #function infix_print(outer_before::String="", inner_before::String=" ", inner_after::String=" ", outer_after::String="")
 function infix_print(outer_before::String="", outer_after::String="", inner_before::String=" ", inner_after::String=inner_before)
@@ -523,7 +527,7 @@ function _mutate(gp::GPConfig, n::GPNode)
 end
 
 # This function modifies the provided tree with root.
-# It returns the new tree.
+# It returns the modified tree.
 function replace_node!(root::GPNode, from::GPNode, to::GPNode)
     root === from && return to
     if from in gp_children(root)
@@ -541,15 +545,29 @@ function gp_replace(type_to_replace::Symbol, transformation::Function, ast::GPNo
     return copy
 end
 
-function gp_replace!(type_to_replace::Symbol, transformation::Function, ast::GPNode, index::Int64=1)
-    if ast.type == type_to_replace
-        ast.value = transformation(index)
-    end
+# function gp_replace!(type_to_replace::Symbol, transformation::Function, ast::GPNode, index::Int64=1)
+#     if ast.type == type_to_replace
+#         ast.value = transformation(index)
+#     end
+#     global_index = index
+#     for child in ast.children
+#         gp_replace!(type_to_replace, transformation, child, global_index)
+#         global_index = global_index + 1
+#     end
+# end
+
+function gp_replace!(type_to_replace::Symbol, transformation::Function, ast::GPNode, index::Int64=0)
     global_index = index
-    for child in ast.children
-        gp_replace!(type_to_replace, transformation, child, global_index)
-        global_index = global_index + 1
+    function _gp_replace!(ast::GPNode)
+        if ast.type == type_to_replace
+            global_index = global_index + 1
+            ast.value = transformation(global_index)
+        end
+        for child in ast.children
+            _gp_replace!(child)
+        end
     end
+    _gp_replace!(ast)
 end
 
 function gp_collect(ast::GPNode, type_to_be_collected::Symbol)

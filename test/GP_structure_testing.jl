@@ -194,6 +194,7 @@ end
     # Renaming some variables
     gp_config = GPConfig(rules)
     ast = build_individual(gp_config, :expr)
+    @test gp_print(ast) == "X + X"
     gp_replace!(:variable, (index) -> string(collect('A':'Z')[index]), ast)
     @test gp_print(ast) == "A + B"
 
@@ -257,4 +258,38 @@ end
             GPNode(:Number, 2)
         ])
     @test !match_constraints(config, n)
+end
+
+@testset "Error management, missing rules" begin
+    rules = [
+        :exp => Any[:foo]
+    ]
+    config = GPConfig(rules; minimum_depth=10)
+    @test_throws AssertionError build_individual(config)
+end
+
+@testset "Node replacement" begin
+    function p(n::GPNode, res::Vector{String})
+        length(gp_children(n)) == 0 && return gp_print(gp_value(n), res)
+
+        gp_print(gp_children(n)[1], res)
+        push!(res, ",")
+        gp_print(gp_children(n)[2], res)
+    end
+
+    rules = [
+        :exp => [Atom(;print=p), :exp, :name],
+        :exp => Any[:name],
+        :name => [Atom(; value_factory=()->"X", id=:my_name)]
+    ]
+    config = GPConfig(rules; minimum_depth=10)
+    ind = build_individual(config)
+    @test gp_print(ind) == "X,X,X,X,X,X,X,X,X,X,X"
+
+    gp_replace!(:my_name, (index)->"Y", ind)
+    r = gp_print(ind)
+    @test gp_print(ind) == "Y,Y,Y,Y,Y,Y,Y,Y,Y,Y,Y"
+
+    gp_replace!(:my_name, (index)->"Z"*string(index), ind)
+    @test gp_print(ind) == "Z1,Z2,Z3,Z4,Z5,Z6,Z7,Z8,Z9,Z10,Z11"
 end
